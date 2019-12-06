@@ -131,6 +131,7 @@ func BaseStart(p Party, task string, prepare ...func(Round) *Error) *Error {
 // an implementation of Update that is shared across the different types of parties (keygen, signing, dynamic groups)
 func BaseUpdate(p Party, msg ParsedMessage, task string) (ok bool, err *Error) {
 	// fast-fail on an invalid message; do not lock the mutex yet
+	fmt.Printf("===--> update triggered in %s\n", p)
 	if _, err := p.ValidateMessage(msg); err != nil {
 		return false, err
 	}
@@ -139,19 +140,24 @@ func BaseUpdate(p Party, msg ParsedMessage, task string) (ok bool, err *Error) {
 		p.unlock()
 		return ok, err
 	}
+	fmt.Printf("===--> trying to lock in %s\n", p)
 	p.lock() // data is written to P state below
 	common.Logger.Debugf("party %s received message: %s", p.PartyID(), msg.String())
+	fmt.Printf("===--> lock done in %s\n", p)
 	if p.round() != nil {
 		common.Logger.Debugf("party %s round %d update: %s", p.PartyID(), p.round().RoundNumber(), msg.String())
 	}
 	if ok, err := p.StoreMessage(msg); err != nil || !ok {
 		return r(false, err)
 	}
+	fmt.Printf("===--> store message done in %s\n", p)
 	if p.round() != nil {
 		common.Logger.Debugf("party %s: %s round %d update", p.round().Params().PartyID(), task, p.round().RoundNumber())
+		fmt.Printf("===--> round update in %s\n", p)
 		if _, err := p.round().Update(); err != nil {
 			return r(false, err)
 		}
+		fmt.Printf("===--> round can processed started in %s, canProcessed: %s\n", p, p.round().CanProceed())
 		if p.round().CanProceed() {
 			if p.advance(); p.round() != nil {
 				if err := p.round().Start(); err != nil {
